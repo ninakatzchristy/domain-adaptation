@@ -1,0 +1,588 @@
+\documentclass{article} % For LaTeX2e
+\usepackage{nips15submit_e,times}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{amsfonts}
+%\documentstyle[nips14submit_09,times,art10]{article} % For LaTeX 2.09
+\usepackage{natbib}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{amsthm}
+\bibliographystyle{abbrvnat}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{dcolumn, tabularx, makecell}
+\usepackage{subcaption}
+\usepackage{pdflscape}
+\pgfplotsset{compat=1.14}
+\usetikzlibrary{shapes,arrows}
+\usetikzlibrary{shapes.arrows}
+\usetikzlibrary{arrows.meta, positioning}
+% \addbibresource{Bibliography.bib}
+% \setlength{\extrarowheight}{5pt}
+\title{Connections between weighting-based and imputation-based domain adaptation methods}
+
+
+\author{
+Nina Katz-Christy\\
+% Department of Computer Science\\
+% Harvard University\\
+% Cambridge, MA 02138 \\
+\texttt{ninakatzchristy@college.harvard.edu}
+}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{assumption}{Assumption}
+
+\nipsfinalcopy % Uncomment for camera-ready version
+
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Imputation-based and weighting-based approaches to domain imputation are often viewed as contrasting frameworks, yet recent empirical and theoretical results suggest they may more similar than previously thought, and even equivalent in some cases. In this work, I review some of the most recent theoretical results connecting these frameworks and prove a bound for the relative error of a propensity score-weighted estimator with respect to the optimal imputation-based estimator corresponding to a class of outcome functions. An epidemiological task is used to empirically compare methods from each framework.
+\end{abstract}
+
+% Frame errors as bias of finite sample estimates or errors of infinite samples?
+
+% Main framing: what makes a propensity score "good"?
+% TO DO:
+% - maybe change "imputation-based" to "outcome-based"?
+% - maybe change "propensity score-based" to "weighted"?
+% - use colors in figures to clarify which data is used in which stage
+
+\section{Introduction}
+% For example, we might have COVID-19 mortality data from the nursing homes in one state, but not for those in another state. The demographic composition of the target state may be substantially different from the observed state, and we must understand these compositional changes in order to perform valid inference. 
+
+In many applications, we only have access to unlabeled data from the population on which we wish to perform inference, but we have labeled data from another population. For example, suppose we are interested in determining the percentage of individuals in a state who have been infected with COVID-19. As it would be infeasible to test the entire population, one strategy would be to test all individuals who attend an in-person doctor's appointment. However, the overall population may differ in important ways from the individuals who come to the doctor's, so it is insufficient to simply apply the rate of COVID-19 cases of those who are tested to the overall population. We would need to account for the difference in population in order to transfer the results from the tested population to the overall population. The task of leveraging labelled data from one population to perform inference on another, compositionally distinct one is known as \emph{domain adaptation}.
+
+A related task is that of the estimation of counterfactual outcomes, usually for the purpose of estimating the \emph{average treatment effect on the treated (ATT)}. In these applications, the limitation is not that the outcome of interest is infeasible to measure directly, but that the outcome of interest is itself hypothetical. For example, consider an educational program that enrolls students based on demonstrated academic achievement. To estimate the effect of the program, it is necessary to estimate the expected performance of the students in the program had they not been in the program, referred to as the \emph{counterfactual}. A naive approach would be to assume the performance of the students in the program would have been the same as those not given the opportunity to enroll. However, the students in the program might differ in important ways from the other students, and this must be taken into account.
+
+There are two major approaches to domain adaptation, imputation-based estimation and propensity score-weighted estimation. In the context of the educational example, an imputation-based approach would first learn how the observed performance of students not in the program differs by individual characteristics, such as their parents' educational background. Then, this estimated function would be applied to the observed characteristics of students in the program to estimate their counterfactual performance. Conversely, a propensity score-based approach would first learn how the composition of students in the program differed from those not selected to enroll. Then, to estimate the counterfactual performance of students who were in the program, the true performances of students not in the program would be re-weighted to approximate the composition of students in the program. For example, if the proportion of students in the program with college-educated parents was higher than of those not in the program, the performance of students not in the program with college-educated parents would be given more weight in this estimate. These two approaches are illustrated in \ref{fig:approaches}.
+
+Clearly, imputation-based methods rely on accurate estimation of the outcome function and propensity score-based methods rely on accurate estimation of the true distributional shift. While these learned functions are typically evaluated via their $l_1$ error (i.e. the expectation of the absolute error over the source distribution), the loss resulting from their respective methods is not directly proportional to this estimation error. In fact, the error for imputation-based and propensity score-based estimation depends, respectively, on the true distribution shift and the true outcome function. 
+
+% We characterize balancing weights as multi-accurate propensity scores
+
+% If one is willing to make additional assumptions about the distribution shift or the outcome function for respectively, domain-based and propensity score-based methods can 
+
+% To provide intuition, we describe each in the context of the preceding example. The propensity score-based approach first attempts to learn how the students in the two schools differ, and then re-weights the performance of the students in the other school to reflect the demographics of the school with the program. For example, if the program has more female students, this approach would weight those students more heavily. The imputation-based approach attempts to learn student's performance as a function of certain characteristics. This function can then be applied to 
+
+This observation has led to a number of methods that aim to minimize the estimation error while invoking as few assumptions as possible. In this paper, we review such methods, summarise connections between the two broad approaches, and propose a method based on a notion introduced in the algorithmic fairness literature. Our proposed method can be implemented prior to observing the outcome data, yet yields results that are provably comparable to the outcome-specific method of imputation-based estimation. We apply our proposed method to data from two U.S. household surveys. 
+
+
+
+% The authors of \cite{kim2022universal} propose estimating the outcome function (for imputation-based estimation) by minimizing a multi-accuracy loss objective with respect to a class of possible distribution shifts. Similarly, we propose estimating the propensity score (for propensity score-based estimation) by minimizing the multi-accuracy loss objective with respect to a class of possible outcome functions. 
+
+
+
+% Contributions:
+% \begin{enumerate}
+%     \item We characterize the error of imputation-based and propensity score-based estimation in terms of, respectively, the true propensity odds and the true outcome function.
+%     \item We provide a theoretical and empirical analysis of propensity weighting via a multi-accurate propensity score estimator, demonstrating that such an estimate is provably close to imputation-based estimators.
+%     \item We view importance/balancing weights as multi-accurate (possibly regularized) estimators with different outcome function classes. Applying our error bounds to the corresponding estimates, we bound their error in terms of the imputation-based estimate corresponding to the optimal function in the outcome function class.
+% \end{enumerate}
+
+% Have balancing weights only been used to calibrate propensity scores? What about calibrating oddss? need to htink more about when propensity scores vs oddss are used for weighting - scores for ATE, odds for ATT
+
+% \section{Related Work}
+% https://arxiv.org/pdf/2204.09193.pdf consider bias of a finite sample estimate, for case where source distribution is fully known
+
+\section{Setup and Assumptions}
+We adopt the setup and notation in \cite{kim2022universal} to emphasize the connections to their approach. In particular, we define a joint distribution over (X, Y, Z) triples, for covariates $X \in \mathcal{X}$, outcome $Y \in \mathcal{Y}$, and source vs. target indicator $Z \in \{s,t\}$. We use $D_s$ and $D_t$ to denote the joint distributions over X, Y pairs conditioned on $Z=s$ and $Z=t$, respectively. Similarly, we let $U_s$ and $U_t$ denote the marginal distribution over $X$, conditioned on $Z=s$ and $Z=t$, respectively. We use $D^*(X)$ to denote the conditional distribution of $Y|X$ and let $f(x) = E(Y|X)$ denote the conditional expectation of the outcome (also referred to as the \emph{outcome function}).
+
+Our estimand is $\mu_t^* = E_{D_t}[Y]$. However, we only observe $(X_1,Y_1), \dots (X_n, Y_n) \sim D_s$ and $X_1, \dots X_n \sim U_t$, as illustrated by the blue blocks in Figure \ref{setup}. In the \emph{domain adaptation} setting, the distributions $D_s$ and $D_t$ are both assumed to be unknown. In the \emph{non-probability sampling} literature, the 
+source and target distributions are referred to as \emph{non-probability} and \emph{probability} distributions, respectively, and the probability (target) distribution is typically assumed to be known. 
+
+In the causal inference context, the estimand can be interpreted as the average expected outcome of the treated units, had they not been treated. When combined with the observed treated outcomes, this can be used to estimate the ATT. Analogously, the \emph{average treatment effect on the untreated (ATU)} can be estimated by estimating the average expected outcome of the untreated units, had they been treated.
+
+% In the causal inference context, should we view the target population as the entire population, so that we observe some of the target outcomes and the source is part of the target?
+
+% Or should we view the estimand as the weighted sum of $\mu_t^*$ and the observed target outcomes?
+
+% do we observe some of the outcomes in the target population? Or should we view the
+
+\begin{figure}[H]
+\centering
+    \tikzstyle{block} = [rectangle, draw, fill=blue!50, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{blockred} = [rectangle, draw, fill=red!20, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{line} = [draw, -{Stealth[length=0.5cm]}]
+    \begin{tikzpicture}[node distance = 3cm, auto]
+    \node[block] (D0) {$X_i \sim D_s$}; 
+    \node[block, right of = D0] (D1) {$X_i' \sim D_t$}; 
+    \node[block, above of = D0] (Y0) {$Y_i|X_i \sim D^*(X_i)$};
+    \node[blockred, above of = D1] (Y1) {$Y_i'|X_i' \sim D^*(X_i')$};
+    \path[line] (D0) -- node {$e_{st}(x)$}(D1);
+    \path[line] (D0) -- node {$E(Y|X)$}(Y0);
+    \end{tikzpicture}
+    \caption{Problem Setting}
+\label{setup}
+\end{figure}
+
+\subsection{Assumptions}
+
+The first assumption we make states that the relationship between outcome $Y$ and covariates $X$ is the same over the source and target distributions. This assumption is often referred to in the causal inference literature as \emph{ignorability}. Formally, we assume,
+$$\Pr[Y|X,Z] = \Pr[Y|X].$$
+% \begin{assumption}[Ignorability]
+%     $\Pr[X,Y,X] = \Pr[X]\cdot\Pr[Y|X]\cdot\Pr[Z|X]$
+% \end{assumption}
+
+Technically, our results depend only on a weaker form of ignorability, \emph{weak mean-ignorability}, defined in \cite{kallus2020generalized} as
+
+\begin{equation*}
+    E[Y|X,Z] = E[Y|X]
+\end{equation*}
+
+Informally, this assumption states that the set of covariates must capture all of the systematic differences between the source and target distribution, at least as far as they relate to the outcome. Note that this depends crucially on how the covariates $X$ are defined. For example, in the educational program example, if income is not included as a covariate, this assumption might be violated if (1) the distribution over income categories differs between the schools and (2) income is associated with different performance outcomes. The assumption would be satisfied if either of these was false.
+
+We also make the standard \emph{overlap} assumption that the probability $Pr(Z=s|X)$ is bounded away from 0 and 1 for all $X \in \mathcal{X}$.
+
+Finally, we assume a uniform prior over $Z \in \{s,t\}$. This is a standard convention as the relative prior probabilities of source vs target distribution only affect the constant factor used in propensity score weighting.   
+
+
+% \begin{enumerate}
+%     \item Uniform prior over $Z \in \{s,t\}$
+%     % \item Overlap?
+% \end{enumerate}
+
+% What about the fact that we can't actually just take an expectation?
+
+% Impt assumption is that we can take expectations over the source distribution! and overlap (i.e. true shift is defined) ignorability
+
+
+% Uniform prior assumption??
+\section{Imputation Approach}
+
+A common approach to domain adaptation is to first attempt to learn a \emph{predictor} which approximates the conditional expectation $E(Y|X)$, and then apply this function to unlabelled samples from the target distribution. This approach is illustrated in \ref{fig:imp}. The corresponding estimator is defined as follows.
+
+\begin{definition}[Imputation-Based Estimator]
+\label{impest}
+For a predictor $p$, we define the imputation-based estimator for $\mu_t^*$ as
+\begin{equation*}
+    \mu_t(p) = E_{D_t}[p(X)]
+\end{equation*}
+\end{definition}
+
+% Technically, this is not a statistic of the data, as we cannot obtain a true expectation, but we follow \cite{kim2022universal} and assume we have enough unlabeled data to reasonably approximate this expectation. Equivalently, we can view the estimator as $\frac{1}{n}\sum_{i=1}^n p(X_i)$ and view the error
+
+When the predictor is equal to the true conditional expectation, this estimator is accurate: $\mu_t(p) = \mu_t^*$.
+
+
+\section{Propensity Score Weighting}
+% also referred to as density ratio estimation
+
+An alternative approach is \emph{propensity score weighting}. A distribution shift can be characterized by its \emph{propensity score odds}, which is defined as the ratio of the probabilities of being in the target and source distributions, respectively, for a given covariate profile $X = x$. In the causal inference setting, this is the odds of being untreated. 
+
+\begin{definition}[True Propensity Odds]
+\begin{equation*}
+    e_{st}(x) = \frac{\Pr[Z = t | X = x]}{\Pr[Z = s | X=x]} = \frac{1 - \Pr[Z = s | X = x]}{\Pr[Z = s | X=x]}
+\end{equation*}
+\end{definition}
+
+Reweighting samples from the source distribution according to an estimate of the propensity odds yields an unbiased estimate of the expectation of Y in the target population. Formally, the propensity score weighted estimator is defined as follows.
+
+\begin{definition}[Propensity Score-Based Estimator]
+\label{psest}
+For a candidate propensity odds $\sigma(X)$, we define the propensity score-based estimator of $\mu_t^*$ as
+\begin{equation*}
+    \mu_t^{PS}(\sigma) = E_{D_s}[\sigma(X) Y ]
+\end{equation*}
+\end{definition}
+
+When the candidate propensity odds is equal to the true propensity odds, the estimator is accurate: $\mu_t^{PS}(\sigma) = \mu_t^*$.
+
+
+\subsection{Propensity Score vs Propensity Odds}
+The probability of being in the source population (or of being treated), $P[Z=s|X=x]$, is often referred to as the \emph{propensity score}. Weighting the outcomes of the untreated population by the inverse propensity score yields an unbiased estimate of the expected potential outcome $Y(0)$ under the full population, which can then be used to estimate the \emph{average treatment effect}. In contrast, we focus on estimating the expected counterfactual $Y(0)$ just for the treated population, which can be estimated by weighting the outcomes of the untreated population with the propensity odds.
+
+\begin{figure}
+% \centering
+\begin{subfigure}{.5\textwidth}
+    \tikzstyle{block} = [rectangle, draw, fill=blue!50, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{blockred} = [rectangle, draw, fill=red!20, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{blockdarkred} = [rectangle, draw, fill=green!20, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{line} = [draw,-{Stealth[length=0.5cm]}]
+    \tikzstyle{linered} = [draw, -{Stealth[length=0.5cm]}, color=red]
+    \begin{tikzpicture}[node distance = 3cm, auto]s
+    \node[block] (D0) {$X_i \sim D_s$}; 
+    \node[blockdarkred, right of = D0] (D1) {$X_i' \sim D_t$}; 
+    \node[block, above of = D0] (Y0) {$Y_i|X_i \sim D^*(X_i)$};
+    \node[blockred, above of = D1] (Y1) {$Y_i'|X_i' \sim D^*(X_i')$};
+    \path[line] (D0) -- node {$e_{st}(x)$}(D1);
+    \path[line] (D0) -- node {$E(Y|X)$}(Y0);
+    \path[linered] (D1) -- node {$p(x)$}(Y1);
+    \end{tikzpicture}
+    \caption{Imputation-Based Approach}
+    \label{fig:imp}
+\end{subfigure}
+\begin{subfigure}{.5\textwidth}
+    \tikzstyle{block} = [rectangle, draw, fill=blue!50, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{blockred} = [rectangle, draw, fill=red!20, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{blockdarkred} = [rectangle, draw, fill=green!20, 
+    text width=4em, text centered, rounded corners, minimum height=4em]
+    \tikzstyle{line} = [draw, -{Stealth[length=0.5cm]}]
+    \tikzstyle{linered} = [draw, -{Stealth[length=0.5cm]}, color=red]
+    \begin{tikzpicture}[node distance = 3cm, auto]
+    \node[block] (D0) {$X_i \sim D_s$}; 
+    \node[block, right of = D0] (D1) {$X_i' \sim D_t$}; 
+    \node[blockdarkred, above of = D0] (Y0) {$Y_i|X_i \sim D^*(X_i)$};
+    \node[blockred, above of = D1] (Y1) {$Y_i'|X_i' \sim D^*(X_i')$};
+    \path[line] (D0) -- node {$e_{st}(x)$}(D1);
+    \path[line] (D0) -- node {$E(Y|X)$}(Y0);
+    \path[linered] (Y0) -- node {$\sigma(x)$}(Y1);
+    \end{tikzpicture}
+    \caption{Weighting-Based Approach}
+    \label{fig:ps}
+\end{subfigure}
+\caption{Two broad approaches for domain adaptation. Blue blocks denote data necessary for the first stage of each method, green blocks denote data necessary for the second stage, and the pink block denotes the unobserved data to be estimated.}
+\label{fig:approaches}
+\end{figure}
+
+\section{Practical Considerations}
+Note that both approaches proceed in two stages. In the first, we estimate, respectively, the outcome function or the propensity odds. In the second, we apply this learned function to, respectively, unlabeled data from the target distribution, or labelled data from the source distribution. Intuitively, the ``heavy lifting" occurs in the first stage, as the second simply involves evaluating the learned function and taking a sample average.
+
+Note that estimating the outcome function for the imputation-based approach only requires samples from the source distribution. This means a practitioner can estimate this function prior to observing examples from the target distribution. Furthermore, they can use the same estimated function to estimate the expected outcome over multiple different target distributions. This motivates the characterization of imputation-based approaches as \emph{target-independent} \citep{kim2022universal}.
+
+Conversely, estimating the propensity odds only requires unlabelled samples from the source and target distributions. This means a practitioner can estimate the propensity odds prior to collecting outcome data. Furthermore, they can use the same estimated propensity odds to estimate multiple different outcomes. In contrast to the target target-independence of imputation-based approaches, propensity score-based estimation can be characterized as \emph{multi-task oriented} \citep{wang2022functional}. 
+
+% Many authors argue that
+
+% Another motivation for propensity score-based approaches is that they are \emph{design-based}. This means that the outcome is not used for 
+
+\section{Error Characterizations}
+We note that the expectation in both estimators must be approximated by an empirical mean. However, we assume for this analysis that labeled examples from the source population and unlabeled examples from the target population are inexpensive enough that the error induced by this approximation to the expectation is negligible. Following \cite{kim2022universal}, we define the error of a statistic $\tilde{\mu}$ as the absolute distance from the true expectation over the target distribution. In the propensity-score based setting (see, e.g. \cite{Kallus2020}), this is defined as the conditional bias, where we condition on the data used to estimate the propensity score.
+
+If the propensity odds is estimated perfectly, then the propensity score-based estimate will have no error and if the conditional expectation $E(Y|X)$ is estimated perfectly by the predictor $p(X)$, then the imputation-based estimate will have no error. However, the error induced by incorrectly estimating either the propensity odds $e_{st}(x)$ or the conditional expectation $f(x) = E(Y|X=x)$ for their respective methods is not simply the $l_1$-error of the respective estimators, $\sigma(x)$ and $p(x)$. In particular, the error of the imputation-based estimate for an estimated conditional expectation $p(X)$, true conditional expectation $f(x) = E(Y|X)$, and true propensity odds $e_{st}(x)$ is
+
+\begin{equation}
+\label{imperror}
+    |\mu_t^{I}(p) - \mu_t^*| = |E_{D_s}[e_{st}(X)\left(p(X) - f(X)\right)]|
+\end{equation}
+
+
+Similarly, the error of the propensity score-based estimate for an estimated propensity odds $\sigma(x)$, true propensity odds $e_{st}(x)$, and true conditional expectation $f(x) = E(Y|X=x)$ is
+
+\begin{equation}
+\label{pserror}
+    |\mu_{t}^{PS}(\sigma) - \mu_t^*| = |E_{D_s}[f(X)\left(\sigma(X) - e_{st}(X)\right)]|
+\end{equation}
+
+% \section{Error Bounds Under Correct Specification}
+
+While these results have been shown in other contexts, both proofs are included the appendix for completeness. 
+
+\section{General Methods for Bounding Error}
+These characterizations imply that, if we know (or hypothesize) that the true propensity odds $e_{st}(x)$ is in some class of functions $\Sigma$, we can bound the error of the imputation-based estimate by learning an estimate $p(x)$ of $f(x)$ such that 
+\begin{equation}
+\label{imperror_forSigma}
+    \max_{\sigma\in\Sigma}E_{D_s}[\sigma(X)\left(p(X) - f(X)\right)]
+\end{equation}
+
+is bounded. Conversely, if we know (or hypothesize) that the true conditional expectation $f(x)$ is in some class of functions $\mathcal{P}$, we can bound the error of the propensity score-based estimate by learning an estimate $\sigma(x)$ of $e_{st}(x)$ such that 
+
+\begin{equation}
+\label{pserror_forP}
+    \max_{p\in\mathcal{P}}E_{D_s}[p(X)\left(\sigma(X) - e_{st}(X)\right)]
+\end{equation}
+is bounded. 
+
+\subsection{Connection to Multi-Accuracy}
+Both of these general methods can be stated with the notion of \emph{multi-accuracy}, a concept first defined by \cite{hebert2018multicalibration} as a measure of the fairness of a prediction algorithm. The definition has since been generalized and applied to various settings \citep{kim2022universal, gopalan2021omnipredictors, Gopalan2021importance}.
+
+\begin{definition}[Multi-Accuracy]
+A hypothesis/predictor h is $\alpha$-multi-accurate for outcome $Y$ with respect to a class of functions $\mathcal{C}$ if for all $c \in \mathcal{C}$,
+$$\max_{c\in\mathcal{C}}|E_{X \sim \mu}[c(X)\left(h(X) - Y\right)]|\le \alpha$$
+\end{definition}
+
+\cite{hebert2018multicalibration} also proposed a boosting-based algorithm to learn a multi-accurate predictor. Since then, others have proposed alternative algorithms and further analyzed the sample complexity of this learning task \citep{hu2022metric}.
+
+Motivated by this connection, \cite{kim2022universal} propose estimating the outcome function for imputation-based estimation and then post-processing this estimated function to ensure it satisfies multi-accuracy for some class of propensity odds ratios. In the propensity score-based setting, \cite{Gopalan2021importance} suggest requiring multi-calibration, a slightly stronger requirement than multi-accuracy, of learned propensity odds, but they do not motivate their suggestion via this error characterization.
+
+% Furthermore, if the true conditional expectation is not in the class of functions $\mathcal{P}$, the propensity score-based estimate is provably close to the optimal
+
+% In this paper,... 
+
+
+% \section{Error Bounds Under Misspecification}
+
+By the error characterizations above, 
+\begin{itemize}
+    \item $\alpha$-multi-accuracy of a predictor $\tilde{p}$ with respect to a class of candidate propensity odds $\Sigma$ ensures the corresponding imputation-based estimate has error at most $\alpha$ if the shift is correctly specified (i.e. $\sigma^* \in \Sigma$) and 
+    \item $\alpha$-multi-accuracy of a propensity odds $\tilde{\sigma}$ with respect to a class of candidate predictors $\mathcal{P}$ ensures the corresponding propensity score-based estimate has error at most $\alpha$ if the conditional expectation is correctly specified (i.e. $E(Y|X) \in \mathcal{P}$).
+\end{itemize}
+
+However, this does not provide any guarantees for when $\Sigma$ or $\mathcal{P}$, do not contain, respectively, the true propensity odds or the true outcome function. It turns out we can still bound the error when the relevant estimator is multi-accurate. 
+
+Informally, \cite{kim2022universal} show the following:
+
+Multi-accuracy of a predictor $\tilde{p}$ with respect to a class of candidate propensity odds $\Sigma$ ensures the corresponding imputation-based estimate has (1) unconditional low error if the shift is correctly specified (i.e. $\sigma^* \in \Sigma$), and (2) not much more error than the propensity score-based estimator corresponding to the best $\sigma \in \Sigma$ otherwise.
+% Furthermore, if the true propensity odds is not in the class of functions $\Sigma$, the imputation-based estimate is provably close to the propensity score-based estimator corresponding to the best $\sigma \in \Sigma$. 
+
+Analogously, I show:
+
+Multi-accuracy of a propensity odds $\tilde{\sigma}$ with respect to a class of candidate predictors $\mathcal{P}$ ensures the corresponding propensity score-based estimate has (1) unconditional low error if the conditional expectation is correctly specified (i.e. $E(Y|X) \in \mathcal{P}$), and (2) not much more error than the imputation-based estimator corresponding to the best $p \in \mathcal{P}$ otherwise.
+% Furthermore, if the true conditional expectation is not in the class of functions $\mathcal{P}$, the propensity score-based estimate is provably close to the imputation-based estimator corresponding to the best $p \in \mathcal{P}$.
+
+
+To state our main result, we first define the \emph{outcome-misspecification error}, which measures how close a predictor $p \in \mathcal{P}$ is to the true outcome function.
+
+\begin{definition}[Outcome-Misspecification Error]
+\begin{equation*}
+    \Delta_s(p) = E_{D_s}[|(Y - p(X))|]
+\end{equation*}
+\end{definition}
+
+Theorem \ref{theorem1} formalizes our main result. We state it using the same notation and structure as \cite{kim2022universal} to emphasize the symmetry between our result and theirs.
+
+\begin{theorem}[Universal Adaptability]
+\label{theorem1}
+    For source and target distributions $D_s$ and $D_t$ over $\mathcal{X}$ with true propensity odds $e_{st}: \mathcal{X} \to [0,1]$, suppose $\mathcal{P} \subseteq \{\mathcal{X}\to \mathcal{Y}\}$ is a collection of candidate predictor functions. Suppose $\tilde{\sigma} : \mathcal{X} \to \mathbb{R}^+$ is a $(\mathcal{P}, \alpha)$-multi-accurate propensity odds over the source $D_s$; then, for any conditional distribution $D^*(X)$, 
+    the propensity score-weighted estimator $\mu_t^{PS}(\tilde{\sigma}) = \mathbb{E}_{D_s}[\tilde{\sigma}(X)\cdot Y]$ is $(\Delta_{p^*}(p) + \alpha)$-close to the imputation-based estimator corresponding to any $p \in \mathcal{P}$. Furthermore, the estimation error of the propensity score-weighted estimator is bounded by the sum of the imputation-based estimation error, the outcome-misspecification error, and $\alpha$, under the best-fit $p \in \mathcal{P}$. That is, 
+    
+    \begin{equation*}
+        er_t(\mu_t^{PS}(\tilde{\sigma})) \le \min_{p \in \mathcal{P}}\{er_t(\mu_t(p)) + \Delta_{p_s}(p) + \alpha\}
+    \end{equation*}
+\end{theorem}
+
+This result demonstrates that, if one can determine a class of functions $\mathcal{P}$ with respect to which a propensity score odds estimate bounds the quantity \ref{pserror_forP}, the corresponding propensity score-weighted estimate will be provably close to the imputation-based estimate corresponding to the optimal $p \in \mathcal{P}$.
+
+Conversely, the result shown in \cite{kim2022universal} demonstrates that, if one can determine a class of functions $\Sigma$ with respect to which a predictor bounds the quantity \ref{imperror_forSigma}, the corresponding imputation-based estimate will be provably close to the propensity score-weighted estimate corresponding to the optimal $\sigma \in \mathcal{C}$. 
+
+\section{Connection to Balancing Weights}
+Some literature considers a generalization of the propensity score-based approach as described here, where instead of attempting to estimate the propensity odds directly, they learn a function of the data that, when used to weight new samples from the source distribution as in the propensity score-weighting approach \ref{impest} yields a corresponding estimate with minimal error. Here we refer to these learned functions as \emph{weighting functions} and the related class of methods as \emph{weighting-based methods}, to emphasize that they do not directly aim to approximate the propensity score odds. A common formulation is to consider minimizing the \emph{conditional mean squared error (CMSE)} of the corresponding estimate where the data used to estimate the weighting function are viewed as fixed and the randomness is over the data used to estimate the expectation. When the CMSE is decomposed into a bias and variance term, the bias term is equivalent to the error \ref{pserror_forP} we consider here. The variance term depends on the variance of the weights and the variance of the conditional distribution $Y|X$.
+
+Many weighting-based approaches characterize the minimization of the CMSE as a constrained optimization problem, where the constraints correspond to bounding the error \ref{pserror_forP} for some class of functions $\mathcal{P}$ and the goal is to minimize the variance of the weights while satisfying this constraint. The error characterization \ref{imperror_forSigma} is also known as an \emph{Integral Probability Metric} between distributions $D_s$ and $D_t$ for function class $\mathcal{P}$ \citep{muller1997integral}. The functions $p\in\mathcal{P}$ in \ref{pserror_forP} are sometimes called moment functions and requiring that \ref{pserror_forP} is 0 for a fixed function $p$ is referred to as a \emph{balancing constraint} \citep{zhao2017entropy}. For different choices of the class of outcome functions $\mathcal{P}$, such as all bounded functions, Lipschitz functions, or RKHS functions, many weighting methods can be viewed as solutions to this optimization problem \citep{ben-michael2021balancing}. \cite{ben-michael2021balancing} provide a unified summary of such methods in the causal inference setting, \cite{wang2022functional} propose a similar style of balancing weights for the \emph{non-probability sampling} setting, and \cite{Kallus2020} show how some matching methods can also be viewed as weights minimizing the conditional mean squared error.
+
+While the learned weighting functions are not explicitly trained to estimate the propensity score odds, note that,if $\mathcal{P}$ is the set of all possible functions from $\mathcal{X}$ to $\mathcal{Y}$ (or equivalently satisfies all possible balancing constraints), then the only function that ensures the error \ref{pserror_forP} is 0 is the true propensity score odds. However, when $\mathcal{P}$ is some smaller set of functions, the true propensity score odds is not the unique function that ensures the error \ref{pserror_forP} is 0, and these approaches selecting the function that minimizes variance. Consequently, these weighting functions can be viewed as regularized propensity score estimators. In fact, \cite{wang2020minimal} show that approximate covariate balancing weights are equivalent to shrinkage estimation of the propensity score.
+
+% Our result shows that if a set of balancing weights satisfies balance with respect to a class of outcome functions, we can bound the distance between the weighted estimator and the optimal imputation-based estimator from the class. For example, \cite{bruns-smith2022} propose weights such that the error term \ref{pserror} is bounded for a class of 
+
+\section{Implied Outcome Functions in Weighting-Based Methods}
+In some cases, weighting-based methods can be framed as imputation-based methods. For example, if we assume the outcome function is linear with coefficients bounded in $l_2$ norm, learning a weighting scheme by minimizing the CMSE and implementing the weighting-based approach \ref{psest} is equivalent to fitting a ridge regression model for $E[Y|X]$ from source samples and implementing the imputation-based approach \ref{impest} \citep{zhao2017entropy}. In particular, even though the weighting function learns from target samples, the weighted estimate \ref{psest} is equivalent to one obtained via the imputation-based method \ref{impest} where the learned outcome function depends only on (and is linear in) labelled source data. \cite{bruns-smith2022} show that this result extends to any class of outcome functions satisfying some minor conditions. 
+
+% the conditional mean squared error always yields weights that are a rescaled and centered member of the class of possible outcome functions (here denoted as $\mathcal{P}$). 
+
+
+% \cite{kallberg2022large} argue that balancing implicitly imposes parametric assumptions on the outcome function
+
+\section{Implied Weights in Imputation-Based Methods}
+Conversely, some imputation-based methods can be framed as weighting-based methods. \cite{chattopadhyay2021implied} show that if a linear model is fit to labelled source distribution data, the imputation-based estimate \ref{impest} can be expressed as a weighting-based estimate \ref{psest} with \emph{implied weights} that are functions only of the unlabeled observations. They show that these weights converge point-wise to the true inverse probability weights if the true propensity score is logistic in the covariates.
+
+% Can all imputation-based estimators be characterized via implied weights?
+% Can weighting-based estimates be characterized via implied outcomes? yes?
+
+% \section{Learning the Propensity vs the Propensity Odds}
+% motivate their method 
+
+% These error characterizations motivated \cite{kim2022universal} to performing imputation-based estimation by first learning an estimate $p(x)$ of $f(x)$ such that $E_{D_s}[\sigma(x)\left(p(x) - f(x)\right)]$ is bounded for any $\sigma \in \Sigma$
+
+% Learning a function $f(x)$
+% can be viewed as the multi-accuracy error as defined in \cite{hebert2018multicalibration} and later extended in various works (cite). 
+
+
+% \section{Connection to Doubly Robustness}
+% \cite{zhao2017entropy} show that, if the propensity score is modeled via logistic regression, and balanced with respect to a class of linear outcome functions, then if either the outcome function or the true propensity odds is linear, the propensity score-based estimator is consistent.
+
+% aug-menting EB with a linear outcome regression does not change the estimator
+
+% Question shouldn't be whether a method is doubly robust, but what class 
+
+\section{Data Application}
+
+\subsection{Data}
+We illustrate these two general approaches via an epidemiological task, where the goal is to estimate 15-year mortality in a target population which differs in substantial ways from the source population. This task and the corresponding data is described in detail in \cite{kim2022universal}. Briefly, the datasets for both distributions are publicly available samples from two US household surveys, each linked to death certificate records from the National Death Index \citep{mort}. The source distribution is based on data collected through the third US National Health and Nutrition Examination Survey (NHANES, n=20,050) and the target distribution is based on data collected through the US National Health Interview Survey (NHIS, n=19,738) \citep{nhis,nhanes}. Table \ref{tab:distribution_shift} in the Appendix summarises the demographic composition and mortality rates for each population.  
+
+\subsection{Methods}
+As a baseline, we first estimate the mortality in the target population simply as the mortality in the source population. 
+Next, we consider three imputation-based methods. First, we fit a random forest (RF) model to the labelled source distribution. Next, we fit a random forest to a subset of the source distribution data and post-process the outcome model with the remaining source distribution data to ensure either multi-accuracy (MA) or multi-calibration (MC) with respect to a class of propensity odds functions defined by ridge regression models. \footnote{While our theoretical results rely only on MA, we show empirical results for MA for comparability to results in \cite{kim2022universal}.}
+
+We implement a hybrid approach which first learns a propensity score model and then is trained to predict the outcome over a source population weighted by this learned propensity score model.
+
+We consider four propensity score weighting approaches. We fit a propensity score model via logistic regression to the full population and use the weighting-based estimator \ref{psest}. We also fit separate propensity score models on subsets of the data defined by demographic groups and use these subgroup-specific weights to obtain subgroup-specific weighting-based estimates. Next, we fit another logistic regression model to a subset of the unlabelled data and post-process the model with the remaining unlabeled data to ensure either multi-accuracy (MA) or multi-calibration (MC) of the propensity score with respect to a class of outcome functions defined by regression trees.  We use the implementation of MCBoost by \cite{kim2022universal}. Unfortunately, this implementation requires the outcome to be bounded by 0 and 1 for each observation, precluding us from ensuring multi-accuracy of the propensity score odds. In future work, it would be interesting to ensure multi-accuracy of the propensity score odds, rather than the propensity score, as this would enable direct application of our theoretical results.
+
+\subsection{Results}
+The naive approach yields severely biased estimates, indicating that adjustment for distribution shift is necessary. All adjustment methods perform similarly well, and there is no evidence that multi-calibration provides substantial benefit as compared to multi-accuracy. There also does not appear to be clear evidence that either multi-accuracy or multi-calibration post-processing significantly improves estimation error, but this could be due to the fact that the initial predictor and propensity score model already satisfied the multi-accuracy criteria. 
+
+\section{Conclusion}
+We have demonstrated theoretically and empirically various connections between weighting-based and imputation-based estimators. In many cases, the approaches are equivalent, yet a full characterization of such cases is unknown.
+
+\begin{landscape}
+\begin{table}[]
+    \centering
+\begin{tabular}{llllllllll}
+& & \multicolumn{3}{c}{Imputation-Based} & Hybrid & \multicolumn{4}{c}{Propensity Score Weighting} \\
+\cline{3-5} \cline{7-10}
+            &       Naive & RF Naive & RF MA & RF MC &  RF & \makecell{Naive \\ Overall}  & \makecell{Naive \\ Subgroup} & Logistic MA & Logistic MC \\
+\hline
+       Overall & 10.1 (57.5) &          1.2 (6.8) &           0.9 (4.9) &           0.9 (4.9) &  \textbf{0.3 (1.5)} &           -0.6 (3.5) &                 &            1.1 (6.4) &            1.1 (6.1) \\
+          Male & 11.8 (62.9) &         -0.3 (1.7) &           0.4 (2.4) &           0.4 (2.4) &          -1.5 (7.9) &  \textbf{-0.1 (0.7)} &           -1.3 (6.9) &            0.6 (3.2) &            0.3 (1.8) \\
+        Female &  8.6 (52.4) &         2.6 (15.5) &           1.2 (7.5) &           1.2 (7.5) &          1.9 (11.3) &  \textbf{-1.0 (5.8)} &   \textbf{0.5 (3.2)} &           1.7 (10.4) &           1.8 (11.0) \\
+Age 18y to 24y &  1.6 (70.5) &        6.0 (267.5) &          1.7 (76.0) &          1.7 (76.0) &         4.7 (209.4) &   \textbf{0.0 (1.1)} &            0.2 (9.5) &           -0.1 (5.8) &          -0.2 (11.2) \\
+Age 25y to 44y &  1.8 (47.6) &         0.9 (23.4) &          0.7 (18.8) &          0.7 (18.8) &  \textbf{0.3 (7.7)} &  \textbf{-0.3 (6.9)} &  \textbf{-0.2 (5.4)} &  \textbf{-0.2 (5.6)} &  \textbf{-0.3 (7.0)} \\
+Age 45y to 64y &  5.1 (28.6) &          1.1 (6.1) &           0.1 (0.7) &           0.1 (0.7) &           0.2 (1.1) &           -0.9 (4.9) &           -0.1 (0.4) &            0.1 (0.7) &  \textbf{-0.0 (0.2)} \\
+Age 65y to 69y &   3.1 (6.8) &         -4.0 (8.8) & \textbf{-1.3 (2.9)} & \textbf{-1.3 (2.9)} &         -5.5 (12.2) &           -4.3 (9.5) &  \textbf{-2.3 (5.0)} &  \textbf{-2.4 (5.3)} &  \textbf{-2.4 (5.2)} \\
+Age 70y to 74y &   4.2 (7.0) &         -2.9 (4.8) &           1.8 (3.0) &           1.8 (3.0) &          -4.9 (8.2) &           -1.4 (2.3) &   \textbf{0.0 (0.0)} &           -0.2 (0.3) &            0.6 (1.0) \\
+     Age 75+ y &   4.2 (4.9) & \textbf{0.7 (0.8)} &           4.0 (4.7) &           4.0 (4.7) & \textbf{-0.5 (0.6)} &            3.7 (4.3) &            3.2 (3.7) &            3.8 (4.4) &            3.5 (4.0) \\
+         White & 18.6 (99.2) &          1.1 (5.9) &           1.1 (5.7) &           1.1 (5.7) &  \textbf{0.1 (0.5)} &  \textbf{-0.1 (0.7)} &           -0.7 (4.0) &            1.1 (5.7) &            0.8 (4.3) \\
+         Black &  4.1 (21.9) &         -0.6 (3.1) & \textbf{-0.2 (0.9)} & \textbf{-0.2 (0.9)} &          -1.3 (6.8) &          -5.2 (27.5) &           -1.6 (8.6) &           -0.4 (2.1) &            0.5 (2.4) \\
+      Hispanic &  8.2 (80.5) &         3.0 (29.7) &          1.7 (16.8) &          1.7 (16.8) &          2.7 (27.0) &   \textbf{0.8 (7.9)} &  \textbf{1.2 (11.3)} &           3.5 (34.1) &           3.8 (37.4) \\
+         Other &  6.7 (74.4) &         3.5 (39.3) &         -2.0 (22.2) &         -2.0 (22.2) &          2.2 (24.6) & \textbf{-1.3 (14.0)} & \textbf{-1.3 (14.9)} & \textbf{-0.9 (10.0)} & \textbf{-1.4 (15.3)} \\
+\hline
+\end{tabular}
+    \caption{Comparison of domain imputation methods to estimate mortality rate in target population. Estimation error overall and within demographic groups is shown with absolute percent error in parenthesis. Results within 2x the optimal method are in bold.}
+    \label{tab:results}
+\end{table}
+\end{landscape}
+
+
+% 1. multi-calibrate the propensity odds, not the propensity score
+
+% 2. explore symmetry for continuous exposure
+
+\bibliography{Bibliography}
+
+\section{Appendix}
+\subsection{Survey Data Distribution Shift}
+\begin{table}[H]
+    \centering
+\begin{tabular}{rrrrr}
+% \hline
+& \multicolumn{2}{c}{Composition} & \multicolumn{2}{c}{Mortality}\\
+  & NHANES & NHIS &NHANES & NHIS\\
+\hline
+Overall & &  & 27.7 & 17.6\\
+\hline
+Male & 46.9 & 47.7 & 29.9 & 18.8\\
+Female & 53.1 & 52.3 & 24.6 & 16.5\\
+Age 18y to 24y & 15.8 & 13.4 & 3.3 & 2.2\\
+Age 25y to 44y & 35.4 & 43.6 & 5.7 & 3.9\\
+Age 45y to 64y & 22.6 & 26.6 & 22.7 & 17.7\\
+Age 65y to 69y & 6.3 & 5.1 & 48.6 & 45.5\\
+Age 70y to 74y & 6.4 & 4.6 & 64.2 & 60.0\\
+Age 75+ y & 13.5 & 6.8 & 0.1 & 86.2\\
+White & 42.3 & 75.8 & 36.7 & 18.7\\
+Black & 27.4 & 11.2 & 22.5 & 18.9\\
+Hispanic & 28.9 & 9.0 & 17.8 & 10.2\\
+Other & 1.5 & 4.0 & 15.4 & 9.0\\
+\hline
+\end{tabular}
+\caption{Overall and within each demographic group, percent of population and percent mortality rate}
+\label{tab:distribution_shift}
+\end{table}
+
+
+\subsection{Lemmas and Proofs}
+\begin{lemma}
+\label{lemma1}
+For any random variable $W$, 
+\begin{equation*}
+   E_{D_t}[W]  = E_{D_s}[e_{st}(X)W]
+\end{equation*}
+\end{lemma}
+\begin{proof}[Proof of Lemma \ref{lemma1}]
+Expanding the expectation,
+$$E_{D_t}[W] = \sum_{x \in \mathcal{X}}\Pr[X=x|Z=t]\cdot W$$
+
+By Bayes rule:
+$$= \sum_{x \in \mathcal{X}}\frac{\Pr[Z=t|X=x]\Pr[X=x]}{\Pr[Z=t]}\cdot W$$
+
+By the uniform priors assumption that $\Pr[Z=t] = \Pr[Z=s]$,
+$$= \sum_{x \in \mathcal{X}}\frac{\Pr[Z=t|X=x]\Pr[X=x]}{\Pr[Z=s]}\cdot W$$
+
+Multiplying by $\frac{\Pr[Z=s|X=x]}{\Pr[Z=s|X=x]}$,
+$$= \sum_{x \in \mathcal{X}}\frac{\Pr[Z=t|X=x]}{\Pr[Z=s|X=x]}\frac{\Pr[Z=s|X=x]\Pr[X=x]}{\Pr[Z=s]}\cdot W$$
+
+By Bayes rule and definition of $e_{st}(x)$,
+$$= \sum_{x \in \mathcal{X}}e_{st}(x)\cdot \Pr[X=x|Z=s]\cdot W$$
+
+Collapsing the expectation,
+$$= E_{D_s}[e_{st}(X)\cdot W]$$
+\end{proof}
+
+\begin{proof}[Proof of Eq \ref{imperror}]
+By definition,
+$$|\mu_t^{I}(p) - \mu_t^*|  = |E_{D_t}[p(X)]-E_{D_t}[Y]|$$
+By lemma \ref{lemma1},
+$$ = |E_{D_s}[e_{st}(X)p(X)]-E_{D_s}[e_{st}(X)Y]|$$
+$$ = |E_{D_s}[e_{st}(X)(p(X)-Y)]|$$
+
+By iterated expectations,
+$$ = |E_{D_s}[E_{D_s}[e_{st}(X)(p(X)-Y)|X]]|$$
+$$ =|E_{D_s}[e_{st}(X)\left(p(X) - f(X)\right)]|$$
+
+\end{proof}
+
+\begin{proof}[Proof of Eq \ref{pserror}]
+By definition,
+$$|\mu_t^{PS}(\sigma) - \mu_t^*| = |E_{D_s}[\sigma(X)Y]-E_{D_t}[Y]|$$
+By lemma \ref{lemma1},
+$$ = |E_{D_s}[\sigma(X)Y]-E_{D_s}[e_{st}(X)Y]|$$
+$$ = |E_{D_s}[Y(\sigma(X)-e_{st}(X))]|$$
+By iterated expectations,
+$$ = |E_{D_s}[E_{D_s}[Y(\sigma(X)-e_{st}(X))|X]]|$$
+$$ = |E_{D_s}[f(X)(\sigma(X)-e_{st}(X))]|$$
+
+\end{proof}
+
+\begin{proof}[Proof of Theorem \ref{theorem1}]
+    Fix an arbitrary $p \in \mathcal{P}$. We first show that the propensity-score based estimator is $(\Delta_{p^*}(p) + \alpha)$-close to the imputation-based estimator corresponding to $p$. Formally, we show,
+
+    \begin{equation*}
+        |\mu_t^{PS}(\tilde{\sigma}) - \mu_t(p)| \le \Delta_{p^*}(p) + \alpha
+    \end{equation*}
+    
+    By definition,
+    \begin{equation*}
+        |\mu_t^{PS}(\tilde{\sigma}) - \mu_t(p)| = |E_{D_s}[\tilde{\sigma}(X)Y] - E_{D_t}[p(X)]|
+    \end{equation*}   
+    
+    
+    By Lemma \ref{lemma1} (below), 
+    $$= |E_{D_s}[\tilde{\sigma}(X)\cdot Y] - E_{D_s}[e_{st}(X)\cdot p(X)]|$$
+    
+    % Combining expectations,
+    % $$= |E_{D_s}[\tilde{\sigma}(X)\cdot Y - e_{st}(X)\cdot p(X)]|$$
+
+    Subtracting and adding $E_{D_s}[\tilde{\sigma}(X) p(X)]$,
+    $$= |E_{D_s}[\tilde{\sigma}(X)\cdot (Y - p(X))] + E_{D_s}[\tilde{\sigma}(X)\cdot p(X)]-E_{D_s}[e_{st}(X)\cdot p(X)]|$$
+
+    $$= |E_{D_s}[\tilde{\sigma}(X)\cdot (Y - p(X))] + E_{D_s}[p(X)\left(\tilde{\sigma}(X)-e_{st}(X)\right)]|$$
+    
+    By the triangle inequality,
+    
+    $$= |E_{D_s}[\tilde{\sigma}(X)\cdot (Y - p(X))]| + |E_{D_s}[p(X)\left(\tilde{\sigma}(X)-e_{st}(X)\right)]|$$
+
+    By the Cauchy-Schwarz inequality,
+    $$\le E_{D_s}[|Y - p(X)|] + |E_{D_s}[p(X)\left(\tilde{\sigma}(X)-e_{st}(X)\right)]|$$
+
+    By multi-accuracy, the second term is bounded by $\alpha$ and the first is defined as $\Delta{p_s}(p)$, so
+    $$\le \Delta_{p_s}(p) + \alpha$$
+    
+    Now that we have shown $\mu_t^{PS}(\tilde{\sigma})$ is close to $\mu_t(p)$ for all $p \in \mathcal{P}$, we can bound the excess error of $\mu_t^{PS}(\tilde{\sigma})$ to prove the theorem. Fix an arbitrary $p \in \mathcal{P}$.
+    
+    $$er_{t}(\mu_t^{PS}(\tilde{\sigma})) = |\mu_t^{PS}(\tilde{\sigma}) - \mu_t^*|$$
+    
+    $$\le |\mu_t^{PS}(\tilde{\sigma}) - \mu_t(p)| + |\mu_t(p) - \mu_t^*|$$
+    $$\le  er_t(\mu_t(p)) + \Delta_{p_s}(p) + \alpha$$
+
+Because this holds for all $p \in \mathcal{P}$, this proves the theorem. 
+\end{proof}
+
+\subsection{Overlap with Ongoing Research}
+I believe the result in Theorem \ref{theorem1} is new, but a similar result was shown in \cite{kim2022universal} (where the roles of $\mathcal{P}$ and $\Sigma$ are flipped). Besides that, the theoretical results I reference are not new, but I try to connect them in a unifying framework. As discussed, the data application is an extension of that in \cite{kim2022universal}. 
+
+\end{document}
